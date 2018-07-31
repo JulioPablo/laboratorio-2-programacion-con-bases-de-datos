@@ -1,0 +1,246 @@
+SQL> start terna
+SQL> create or replace type terna as object(iteracion number(5), primo1 number, primo2 number);
+  2  /
+
+Type created.
+
+SQL> start esprimo
+SQL> CREATE OR REPLACE FUNCTION EsPrimo(x NUMBER)
+  2  	 RETURN BOOLEAN
+  3  	 AS
+  4  	     BEGIN
+  5  		 IF (x = 2) THEN
+  6  		     RETURN TRUE;
+  7  		 END IF;
+  8  
+  9  		 IF (MOD(x, 2) = 0) THEN
+ 10  		     RETURN FALSE;
+ 11  		 END IF;
+ 12  
+ 13  		 FOR i IN 2..(x -1) LOOP
+ 14  		     IF (MOD(x, i) = 0) THEN
+ 15  			 RETURN FALSE;
+ 16  		     END IF;
+ 17  	     END LOOP;
+ 18  	     RETURN TRUE;
+ 19  END;
+ 20  /
+
+Function created.
+
+SQL> start goldbach
+SQL> CREATE OR REPLACE FUNCTION Goldbach(n NUMBER) RETURN terna AS
+  2  	     i NUMBER(10);
+  3  	     iteraciones NUMBER(5) := 0;
+  4  BEGIN
+  5  
+  6  	    IF (MOD(n, 2) != 0) THEN
+  7  	     RETURN terna(NULL,NULL,NULL);
+  8  	    END IF;
+  9  
+ 10  	    IF (n = 4) THEN
+ 11  	     i := 2;
+ 12  	    ELSE
+ 13  	     i := 3;
+ 14  	    END IF;
+ 15  
+ 16  	    WHILE (i <= n/2) LOOP
+ 17  	     iteraciones := iteraciones + 1;
+ 18  	     IF(EsPrimo(i) AND	EsPrimo(n - i)) THEN
+ 19  		 RETURN terna(iteraciones,(n - i),i);
+ 20  	     END IF;
+ 21  	     i := i +2;
+ 22  	    END LOOP;
+ 23  
+ 24  	    --Goldbach estaba equivocado
+ 25  	    RETURN terna(iteraciones,0,0);
+ 26  
+ 27  END;
+ 28  /
+
+Function created.
+
+SQL> start setprimo
+SQL> CREATE OR REPLACE PROCEDURE SetPrimo(n NUMBER) AS
+  2  	 secuencia_textual VARCHAR2(1000);
+  3  	 limite PRIMOS.VALOR%TYPE;
+  4  	 i NUMBER;
+  5  	 BEGIN
+  6  
+  7  	     SELECT MAX(VALOR) INTO limite FROM PRIMOS;
+  8  
+  9  	     IF limite IS NULL THEN
+ 10  		 limite := 2;
+ 11  		 INSERT INTO PRIMOS VALUES (2);
+ 12  	     END IF;
+ 13  
+ 14  
+ 15  	     IF (limite <= 2) THEN
+ 16  		 secuencia_textual :='2';
+ 17  	     END IF;
+ 18  
+ 19  	     IF (limite < 2) THEN
+ 20  		 INSERT INTO PRIMOS VALUES (2);
+ 21  	     END IF;
+ 22  
+ 23  
+ 24  	     FOR i IN 3..n LOOP
+ 25  		 IF (EsPrimo(i) AND i > limite AND i <= n ) THEN
+ 26  		     secuencia_textual := secuencia_textual || ',' || i;
+ 27  		     INSERT INTO PRIMOS VALUES (i);
+ 28  		 END IF;
+ 29  	     END LOOP;
+ 30  
+ 31  	     DBMS_OUTPUT.PUT_LINE(secuencia_textual);
+ 32  END;
+ 33  /
+
+Procedure created.
+
+SQL> start demuestre
+SQL> CREATE OR REPLACE PROCEDURE Demuestre(n NUMBER) AS
+  2  	 tern terna;
+  3  	 cardinalidad NUMBER;
+  4  	 i NUMBER;
+  5  	 BEGIN
+  6  
+  7  
+  8  		 IF MOD(n, 2) = 0 AND n > 2 THEN
+  9  		     tern := Goldbach(n);
+ 10  		     DBMS_OUTPUT.PUT_LINE('Buscando Goldbach de ' || n);
+ 11  		     DBMS_OUTPUT.PUT_LINE('Goldbach = ' || n || ' Iteraciones: ' || tern.iteracion || ' Primo1: ' || tern.primo1 || ' Primo2: ' || tern.primo2);
+ 12  		 ELSIF MOD(n, 2) = 0 AND n < 2 THEN
+ 13  		     DBMS_OUTPUT.PUT_LINE('Nada que buscar de ' || n);
+ 14  		 ELSIF MOD(n, 2) != 0 AND EsPrimo(n) THEN
+ 15  		     DBMS_OUTPUT.PUT_LINE('Buscando cardinalidad de ' || n);
+ 16  		     SetPrimo(n);
+ 17  		     SELECT COUNT(VALOR) INTO cardinalidad FROM PRIMOS WHERE VALOR <= n;
+ 18  		     DBMS_OUTPUT.PUT_LINE('Cardinalidad de: ' || n || ' = ' || cardinalidad);
+ 19  		 ELSIF MOD(n, 2) != 0 THEN
+ 20  		     DBMS_OUTPUT.PUT_LINE('Buscando dos multiplos que producen ' || n);
+ 21  		     FOR i in 2..n LOOP
+ 22  			 IF(MOD(n, i) = 0) THEN
+ 23  			     DBMS_OUTPUT.PUT_LINE(i || ' * ' || n/i || ' = ' || n);
+ 24  			 RETURN;
+ 25  			 END IF;
+ 26  		     END LOOP;
+ 27  		 ELSE
+ 28  		     DBMS_OUTPUT.PUT_LINE('Algo terrible esta ocurriendo...');
+ 29  		 END IF;
+ 30  
+ 31  	 END;
+ 32  	 /
+
+Procedure created.
+
+SQL> start gold
+SQL> CREATE OR REPLACE PACKAGE gold AS
+  2  	 FUNCTION Goldbach(n NUMBER) RETURN terna;
+  3  	 PROCEDURE SetPrimo(n NUMBER);
+  4  	 PROCEDURE Demuestre(n NUMBER);
+  5  END gold;
+  6  /
+
+Package created.
+
+SQL> 
+SQL> CREATE OR REPLACE PACKAGE BODY gold AS
+  2  
+  3  FUNCTION Goldbach(n NUMBER) RETURN terna AS
+  4  	     i NUMBER(10);
+  5  	     iteraciones NUMBER(5) := 0;
+  6  BEGIN
+  7  
+  8  	    IF (MOD(n, 2) != 0) THEN
+  9  	     RETURN terna(NULL,NULL,NULL);
+ 10  	    END IF;
+ 11  
+ 12  	    IF (n = 4) THEN
+ 13  	     i := 2;
+ 14  	    ELSE
+ 15  	     i := 3;
+ 16  	    END IF;
+ 17  
+ 18  	    WHILE (i <= n/2) LOOP
+ 19  	     iteraciones := iteraciones + 1;
+ 20  	     IF(EsPrimo(i) AND	EsPrimo(n - i)) THEN
+ 21  		 RETURN terna(iteraciones,(n - i),i);
+ 22  	     END IF;
+ 23  	     i := i +2;
+ 24  	    END LOOP;
+ 25  
+ 26  	    --Goldbach estaba equivocado
+ 27  	    RETURN terna(iteraciones,0,0);
+ 28  
+ 29  END;
+ 30  
+ 31  PROCEDURE SetPrimo(n NUMBER) AS
+ 32  	 secuencia_textual VARCHAR2(1000);
+ 33  	 limite PRIMOS.VALOR%TYPE;
+ 34  	 i NUMBER;
+ 35  	 BEGIN
+ 36  
+ 37  	     SELECT MAX(VALOR) INTO limite FROM PRIMOS;
+ 38  
+ 39  	     IF limite IS NULL THEN
+ 40  		 limite := 2;
+ 41  		 INSERT INTO PRIMOS VALUES (2);
+ 42  	     END IF;
+ 43  
+ 44  
+ 45  	     IF (limite <= 2) THEN
+ 46  		 secuencia_textual :='2';
+ 47  	     END IF;
+ 48  
+ 49  	     IF (limite < 2) THEN
+ 50  		 INSERT INTO PRIMOS VALUES (2);
+ 51  	     END IF;
+ 52  
+ 53  
+ 54  	     FOR i IN 3..n LOOP
+ 55  		 IF (EsPrimo(i) AND i > limite AND i <= n ) THEN
+ 56  		     secuencia_textual := secuencia_textual || ',' || i;
+ 57  		     INSERT INTO PRIMOS VALUES (i);
+ 58  		 END IF;
+ 59  	     END LOOP;
+ 60  
+ 61  	     DBMS_OUTPUT.PUT_LINE(secuencia_textual);
+ 62  END;
+ 63  
+ 64  PROCEDURE Demuestre(n NUMBER) AS
+ 65  	 tern terna;
+ 66  	 cardinalidad NUMBER;
+ 67  	 i NUMBER;
+ 68  	 BEGIN
+ 69  
+ 70  
+ 71  		 IF MOD(n, 2) = 0 AND n > 2 THEN
+ 72  		     tern := Goldbach(n);
+ 73  		     DBMS_OUTPUT.PUT_LINE('Buscando Goldbach de ' || n);
+ 74  		     DBMS_OUTPUT.PUT_LINE('Goldbach = ' || n || ' Iteraciones: ' || tern.iteracion || ' Primo1: ' || tern.primo1 || ' Primo2: ' || tern.primo2);
+ 75  		 ELSIF MOD(n, 2) = 0 AND n < 2 THEN
+ 76  		     DBMS_OUTPUT.PUT_LINE('Nada que buscar de ' || n);
+ 77  		 ELSIF MOD(n, 2) != 0 AND EsPrimo(n) THEN
+ 78  		     DBMS_OUTPUT.PUT_LINE('Buscando cardinalidad de ' || n);
+ 79  		     SetPrimo(n);
+ 80  		     SELECT COUNT(VALOR) INTO cardinalidad FROM PRIMOS WHERE VALOR <= n;
+ 81  		     DBMS_OUTPUT.PUT_LINE('Cardinalidad de: ' || n || ' = ' || cardinalidad);
+ 82  		 ELSIF MOD(n, 2) != 0 THEN
+ 83  		     DBMS_OUTPUT.PUT_LINE('Buscando dos multiplos que producen ' || n);
+ 84  		     FOR i in 2..n LOOP
+ 85  			 IF(MOD(n, i) = 0) THEN
+ 86  			     DBMS_OUTPUT.PUT_LINE(i || ' * ' || n/i || ' = ' || n);
+ 87  			 RETURN;
+ 88  			 END IF;
+ 89  		     END LOOP;
+ 90  		 ELSE
+ 91  		     DBMS_OUTPUT.PUT_LINE('Algo terrible esta ocurriendo...');
+ 92  		 END IF;
+ 93  
+ 94  	 END;
+ 95  END gold;
+ 96  /
+
+Package body created.
+
+SQL> spool off
